@@ -22,15 +22,33 @@ def generate_uox_id():
         return uox_id
 
 
-class CBHCompoundIdResource(ModelResource):
+class CBHCompoundIdResource(Resource):
     """web service for accessing Compound Ids
     Request without an inchi key will be considered a request for a blinded ID or a forced new ID in that project and installation_key
     Request with and inchi key - inchi will be saved if it is public 
     Inchi will not be saved if it is private
-    """=    
+
+    Scenarios:
+
+    Have blinded compound in project, need ID
+    - asses for uniqueness locally and ask for new ID - no data - return new ID
+
+    New to project Private compound - no data - return new ID
+    - Ask for new ID
+
+    Existing in project private or public compound - assigned id- return new batch id
+    - Ask for new batch
+
+    Possibly new Public compound
+    - Test for uniqueness against other public compounds - inchi key
+
+    Making private compound public
+    - Test for uniqueness against other public compounds - inchi key AND assigned id
+
+    """    
     inchi_key = fields.CharField(attribute='inchi_key', required=False)
-
-
+    installation_key =  fields.CharField(attribute='installation_key')
+    unique_id =  fields.CharField(attribute='unique_id')
 
     class Meta:
         resource_name = 'cbh_compound_ids'
@@ -96,31 +114,20 @@ class CBHCompoundIdResource(ModelResource):
         for data in deserialized[collection_name]:
             # If there's a resource_uri then this is either an
             # update-in-place or a create-via-PUT.
-            if "assigned_id" in data:
-                raise BadRequest("Assigned ID must not be set, this API is for creating new IDs")
-            if "inchi_key" in data:
-                inchi_key = data.pop('inchi_key')
-                try:
-                    obj = CBHCompoundId.objects.get(structure_key=inchi_key)
+            
+            assigned_id = data.get('assigned_id', None)
+            inchi_key = data.get('inchi_key', None)
 
-                    # The object does exist, so we return the original object with the original ID
-                    bundle = self.build_bundle(obj=obj, request=request)
-                    bundle = self.full_dehydrate(bundle, for_list=True)
-                    bundle = self.alter_detail_data_to_serialize(request, bundle)
-                    #self.update_in_place(request, bundle, data)
-                except (ObjectDoesNotExist, MultipleObjectsReturned):
-                    # The object does not exist so we create it
-                    data = self.alter_deserialized_detail_data(request, data)
-                    bundle = self.build_bundle(data=dict_strip_unicode_keys(data), request=request)
-                    self.obj_create(bundle=bundle)
+            if assigned_id and inchi_key:
+                data["response"] = CBHCompoundId.objects.make_compound_public(data)
+            elif inchi_key:
+                data["response"] = CBHCompoundId.objects.new_public_compound(data)
+            elif assigned_id:
+                data["response"] = CBHCompoundId.objects.new_batch(data)
             else:
-                # There's no resource URI, so this is a create call just
-                # like a POST to the list resource.
-                data = self.alter_deserialized_detail_data(request, data)
-                bundle = self.build_bundle(data=dict_strip_unicode_keys(data), request=request)
-                self.obj_create(bundle=bundle)
-
-            bundles_seen.append(bundle)
+                data["response"] = CBHCompoundId.objects.new_private_compound(data)
+            
+            bundles_seen.append(data)
 
       
         if not self._meta.always_return_data:

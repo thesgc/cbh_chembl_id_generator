@@ -47,5 +47,4 @@ class CBHCompoundId(models.Model):
     structure_key = models.CharField(max_length=50, unique=True)
     assigned_id = models.CharField(max_length=12, unique=True)
     original_installation_key = models.CharField(max_length=10)
-    original_project_key = models.CharField(max_length=20)
     current_batch_id = models.IntegerField(default=0)
