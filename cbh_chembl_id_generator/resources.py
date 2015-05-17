@@ -30,14 +30,16 @@ class CBHCompoundIdResource(Resource):
 
     Scenarios:
 
-    Have blinded compound in project, need ID
-    - asses for uniqueness locally and ask for new ID - no data - return new ID
+    Registering blinded compound in project, need ID
+    - asses for uniqueness locally and 
+            ask for new ID if new by putting no data in request
+            OR ask for new batch (see below)
 
     New to project Private compound - no data - return new ID
     - Ask for new ID
 
     Existing in project private or public compound - assigned id- return new batch id
-    - Ask for new batch
+    - Ask for new batch by giving assigned id
 
     Possibly new Public compound
     - Test for uniqueness against other public compounds - inchi key
@@ -115,8 +117,8 @@ class CBHCompoundIdResource(Resource):
             # If there's a resource_uri then this is either an
             # update-in-place or a create-via-PUT.
             
-            assigned_id = data.get('assigned_id', None)
-            inchi_key = data.get('inchi_key', None)
+            assigned_id = data.get('assigned_id', '')
+            inchi_key = data.get('inchi_key', '')
 
             if assigned_id and inchi_key:
                 data["response"] = CBHCompoundId.objects.make_compound_public(data)
@@ -139,11 +141,20 @@ class CBHCompoundIdResource(Resource):
             return self.create_response(request, to_be_serialized, response_class=http.HttpAccepted)
 
 
-    def alter_deserialized_detail_data(request, data):
-        '''Make our request data into the right format to be saved'''
-        data["assigned_id"] = generate_uox_id()
-        if data.get("inchi_key", None):
-            data["structure_key"] = data.pop("inchi_key")
-        else:
-            data["structure_key"] = data["assigned_id"]
-        return data
+
+    def alter_deserialized_list_data(self, request, deserialized):
+        schema = deserialized["schema"]
+        blinded_key_fieldkeys = [field["key"] for field in schema["form"]]
+        for obj in deserialized["objects"]:
+            if not obj.get("inchi_key", None) and obj.get("custom_fields"):
+                #If no inchi key look for blinded key compounents
+                blinded_key_components = [obj["original_installation_keyv"],obj["project_key"]]
+                for key in blinded_key_fieldkeys:
+                    blinded_key_components += [obj["custom_fields"][key]
+                if len(blinded_key_components) > 2:
+                    #If there is a blinded key against the project
+                    obj["inchi_key"] = "__".join(blinded_key_components)
+
+                for field in schema["form"]
+        deserialized["project"] = proj
+        return deserialized
