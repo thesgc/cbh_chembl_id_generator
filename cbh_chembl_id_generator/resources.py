@@ -39,7 +39,7 @@ class CBHPluginResource(ModelResource):
             "data" : "properties.%s" % bundle.obj.space_replaced_name(),
             "readOnly": True, 
             "className": "htCenter htMiddle ", 
-            "renderer": "centeredNumericRenderer"
+            "renderer": "customFieldRenderer"
         }
 
 
