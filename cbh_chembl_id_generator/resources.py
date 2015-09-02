@@ -1,7 +1,7 @@
 from tastypie import fields
-from tastypie.resources import Resource
+from tastypie.resources import Resource, ModelResource
 from tastypie.authorization import Authorization
-from cbh_chembl_id_generator.models import CBHCompoundId
+from cbh_chembl_id_generator.models import CBHCompoundId, CBHPlugin
 
 
 def generate_uox_id():
@@ -20,6 +20,27 @@ def generate_uox_id():
         return generate_uox_id()
     except  ObjectDoesNotExist:
         return uox_id
+
+
+class CBHPluginResource(ModelResource):
+    handsontable_column = fields.DictField(default=None)
+    class Meta:
+        always_return_data = True
+        queryset = CBHPlugin.objects.all()
+        resource_name = 'cbh_plugins'
+        authorization = Authorization()
+        include_resource_uri = False
+        allowed_methods = ['get']
+        default_format = 'application/json'
+
+    def dehydrate_handsontable_column(self, bundle):
+        return {
+            "knownBy" : bundle.obj.name,
+            "data" : "properties.%s" % bundle.obj.space_replaced_name(),
+            "readOnly": True, 
+            "className": "htCenter htMiddle ", 
+            "renderer": "centeredNumericRenderer"
+        }
 
 
 class CBHCompoundIdResource(Resource):
@@ -48,7 +69,7 @@ class CBHCompoundIdResource(Resource):
     - Test for uniqueness against other public compounds - inchi key AND assigned id
 
     """    
-    inchi_key = fields.CharField(attribute='inchi_key', required=False)
+    inchi_key = fields.CharField(attribute='inchi_key')
     installation_key =  fields.CharField(attribute='installation_key')
     unique_id =  fields.CharField(attribute='unique_id')
 
@@ -150,11 +171,10 @@ class CBHCompoundIdResource(Resource):
                 #If no inchi key look for blinded key compounents
                 blinded_key_components = [obj["original_installation_keyv"],obj["project_key"]]
                 for key in blinded_key_fieldkeys:
-                    blinded_key_components += [obj["custom_fields"][key]
+                    blinded_key_components += [obj["custom_fields"][key]]
                 if len(blinded_key_components) > 2:
                     #If there is a blinded key against the project
                     obj["inchi_key"] = "__".join(blinded_key_components)
 
-                for field in schema["form"]
         deserialized["project"] = proj
         return deserialized

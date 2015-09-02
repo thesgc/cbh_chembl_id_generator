@@ -1,5 +1,59 @@
 # -*- coding: utf-8 -*-
 from django.db import models
+from django.db.models.signals import pre_save
+from importlib import import_module
+
+def deepgetattr(obj, attr, ex):
+    """Recurses through an attribute chain to get the ultimate value."""
+    try:
+        return reduce(getattr, attr.split('.'), obj)
+
+    except:
+        return ex
+
+PLUGIN_TYPE_CHOICES = (
+    ( "chemreg_on_upload", "ChemReg (applies on upload)"),
+    )
+
+
+class CBHPlugin(models.Model):
+    name = models.CharField(max_length=50)
+    full_function_name = models.CharField(max_length=100)
+    plugin_type = models.CharField(max_length=20, choices=PLUGIN_TYPE_CHOICES)
+    input_json_path = models.CharField(max_length=200, help_text="Based on the JSON format of a molecule produced by the ChemReg API take this item as the input argument to the plugin function")
+
+    def space_replaced_name(self):
+        return self.name.replace(" ", "__space__")
+
+    def module_name(self):
+        return ".".join(self.full_function_name.split(".")[:-1])
+
+    def plugin_func(self):
+        return self.full_function_name.split(".")[-1]
+
+
+
+    def apply_to_cbh_compound_batch(self, batch):
+        plugin_module = import_module(self.module_name())
+        plugin_func = getattr(plugin_module, self.plugin_func())
+        input_obj = deepgetattr(batch, self.input_json_path, None)
+        output = plugin_func(input_obj)
+        batch.properties[self.space_replaced_name()] = output
+
+
+
+
+
+def apply_plugins(sender, instance, **kwargs):
+    '''After saving the project make sure it has entries in the permissions table'''
+    for plugin in CBHPlugin.objects.filter(plugin_type="chemreg_on_upload"):
+        plugin.apply_to_cbh_compound_batch(instance)
+
+
+pre_save.connect(apply_plugins, sender="cbh_chembl_model_extension.CBHCompoundBatch", dispatch_uid="plugins")
+
+
+
 
 class CBHCompoundIdManager(models.Manager):
     def make_compound_public(self, data):
