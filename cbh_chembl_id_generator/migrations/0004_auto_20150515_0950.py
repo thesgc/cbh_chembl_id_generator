@@ -5,10 +5,12 @@ from django.db import models, migrations
 
 
 class Migration(migrations.Migration):
+
     '''Migration to add the functions necessary in order to generate ids at the database level'''
 
     dependencies = [
-        ('cbh_chembl_id_generator', '0003_remove_cbhcompoundid_original_project_key'),
+        ('cbh_chembl_id_generator',
+         '0003_remove_cbhcompoundid_original_project_key'),
     ]
 
     operations = [

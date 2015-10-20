@@ -14,16 +14,18 @@ def generate_uox_id():
     three_letterg = shortuuid.ShortUUID()
     three_letterg.set_alphabet("ABCDEFGHJKLMNPQRSTUVWXYZ")
     three_letter = three_letterg.random(length=3)
-    uox_id = "%s%s%s%s" % (settings.ID_PREFIX ,two_letter, two_number, three_letter )
+    uox_id = "%s%s%s%s" % (
+        settings.ID_PREFIX, two_letter, two_number, three_letter)
     try:
         CBHCompoundId.objects.get(assigned_id=uox_id)
         return generate_uox_id()
-    except  ObjectDoesNotExist:
+    except ObjectDoesNotExist:
         return uox_id
 
 
 class CBHPluginResource(ModelResource):
     handsontable_column = fields.DictField(default=None)
+
     class Meta:
         always_return_data = True
         queryset = CBHPlugin.objects.all()
@@ -35,15 +37,16 @@ class CBHPluginResource(ModelResource):
 
     def dehydrate_handsontable_column(self, bundle):
         return {
-            "knownBy" : bundle.obj.name,
-            "data" : "properties.%s" % bundle.obj.space_replaced_name(),
-            "readOnly": True, 
-            "className": "htCenter htMiddle ", 
+            "knownBy": bundle.obj.name,
+            "data": "properties.%s" % bundle.obj.space_replaced_name(),
+            "readOnly": True,
+            "className": "htCenter htMiddle ",
             "renderer": "customFieldRenderer"
         }
 
 
 class CBHCompoundIdResource(Resource):
+
     """web service for accessing Compound Ids
     Request without an inchi key will be considered a request for a blinded ID or a forced new ID in that project and installation_key
     Request with and inchi key - inchi will be saved if it is public 
@@ -68,19 +71,17 @@ class CBHCompoundIdResource(Resource):
     Making private compound public
     - Test for uniqueness against other public compounds - inchi key AND assigned id
 
-    """    
+    """
     inchi_key = fields.CharField(attribute='inchi_key')
-    installation_key =  fields.CharField(attribute='installation_key')
-    unique_id =  fields.CharField(attribute='unique_id')
+    installation_key = fields.CharField(attribute='installation_key')
+    unique_id = fields.CharField(attribute='unique_id')
 
     class Meta:
         resource_name = 'cbh_compound_ids'
         authorization = Authorization()
         always_return_data = True
         collection_name = "objects"
-        allowed_methods =["post", "patch"]
-
-
+        allowed_methods = ["post", "patch"]
 
     def patch_list(self, request, **kwargs):
         """
@@ -122,12 +123,14 @@ class CBHCompoundIdResource(Resource):
         other than ``objects`` (default).
         """
         request = convert_post_to_patch(request)
-        deserialized = self.deserialize(request, request.body, format=request.META.get('CONTENT_TYPE', 'application/json'))
+        deserialized = self.deserialize(request, request.body, format=request.META.get(
+            'CONTENT_TYPE', 'application/json'))
 
         collection_name = self._meta.collection_name
 
         if collection_name not in deserialized:
-            raise BadRequest("Invalid data sent: missing '%s'" % collection_name)
+            raise BadRequest(
+                "Invalid data sent: missing '%s'" % collection_name)
 
         if len(deserialized[collection_name]) and 'put' not in self._meta.detail_allowed_methods:
             raise ImmediateHttpResponse(response=http.HttpMethodNotAllowed())
@@ -137,43 +140,46 @@ class CBHCompoundIdResource(Resource):
         for data in deserialized[collection_name]:
             # If there's a resource_uri then this is either an
             # update-in-place or a create-via-PUT.
-            
+
             assigned_id = data.get('assigned_id', '')
             inchi_key = data.get('inchi_key', '')
 
             if assigned_id and inchi_key:
-                data["response"] = CBHCompoundId.objects.make_compound_public(data)
+                data["response"] = CBHCompoundId.objects.make_compound_public(
+                    data)
             elif inchi_key:
-                data["response"] = CBHCompoundId.objects.new_public_compound(data)
+                data["response"] = CBHCompoundId.objects.new_public_compound(
+                    data)
             elif assigned_id:
                 data["response"] = CBHCompoundId.objects.new_batch(data)
             else:
-                data["response"] = CBHCompoundId.objects.new_private_compound(data)
-            
+                data["response"] = CBHCompoundId.objects.new_private_compound(
+                    data)
+
             bundles_seen.append(data)
 
-      
         if not self._meta.always_return_data:
             return http.HttpAccepted()
         else:
             to_be_serialized = {}
-            to_be_serialized['objects'] = [self.full_dehydrate(bundle, for_list=True) for bundle in bundles_seen]
-            to_be_serialized = self.alter_list_data_to_serialize(request, to_be_serialized)
+            to_be_serialized['objects'] = [
+                self.full_dehydrate(bundle, for_list=True) for bundle in bundles_seen]
+            to_be_serialized = self.alter_list_data_to_serialize(
+                request, to_be_serialized)
             return self.create_response(request, to_be_serialized, response_class=http.HttpAccepted)
-
-
 
     def alter_deserialized_list_data(self, request, deserialized):
         schema = deserialized["schema"]
         blinded_key_fieldkeys = [field["key"] for field in schema["form"]]
         for obj in deserialized["objects"]:
             if not obj.get("inchi_key", None) and obj.get("custom_fields"):
-                #If no inchi key look for blinded key compounents
-                blinded_key_components = [obj["original_installation_keyv"],obj["project_key"]]
+                # If no inchi key look for blinded key compounents
+                blinded_key_components = [
+                    obj["original_installation_keyv"], obj["project_key"]]
                 for key in blinded_key_fieldkeys:
                     blinded_key_components += [obj["custom_fields"][key]]
                 if len(blinded_key_components) > 2:
-                    #If there is a blinded key against the project
+                    # If there is a blinded key against the project
                     obj["inchi_key"] = "__".join(blinded_key_components)
 
         deserialized["project"] = proj
