@@ -2,7 +2,7 @@ from tastypie import fields
 from tastypie.resources import Resource, ModelResource
 from tastypie.authorization import Authorization
 from cbh_chembl_id_generator.models import CBHCompoundId, CBHPlugin
-
+from tastypie.exceptions import ImmediateHttpResponse
 
 def generate_uox_id():
     two_letterg = shortuuid.ShortUUID()
